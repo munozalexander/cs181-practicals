@@ -75,7 +75,8 @@ except ImportError:
     import xml.etree.ElementTree as ET
 import numpy as np
 from scipy import sparse
-
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
 import util
 
 
@@ -228,7 +229,7 @@ def system_call_count_feats(tree):
             c['num_system_calls'] += 1
     return c
 
-def num_system_calls(tree):
+def system_call_counts(tree):
     c = Counter()
     in_all_section = False
     for el in tree.iter():
@@ -244,10 +245,10 @@ def num_system_calls(tree):
 def main():
     train_dir = "train"
     test_dir = "test"
-    outputfile = "sample_predictions.csv"  # feel free to change this or take it as an argument
+    outputfile = "logistic.csv"  # feel free to change this or take it as an argument
 
     # TODO put the names of the feature functions you've defined above in this list
-    ffs = [num_system_calls]
+    ffs = [system_call_counts]
 
     # extract features
     print "extracting training features..."
@@ -257,7 +258,9 @@ def main():
 
     # TODO train here, and learn your classification parameters
     print "learning..."
-    learned_W = np.random.random((len(global_feat_dict),len(util.malware_classes)))
+    RF = RandomForestClassifier()
+    RF.fit(X_train, t_train)
+    #learned_W = np.random.random((len(global_feat_dict),len(util.malware_classes)))
     print "done learning"
     print
 
@@ -272,7 +275,8 @@ def main():
 
     # TODO make predictions on text data and write them out
     print "making predictions..."
-    preds = np.argmax(X_test.dot(learned_W),axis=1)
+    preds = RF.predict(X_test)
+    #preds = np.argmax(X_test.dot(learned_W),axis=1)
     print "done making predictions"
     print
 
