@@ -67,6 +67,11 @@
 ## a streaming way. See http://eli.thegreenplace.net/2012/03/15/processing-xml-in-python-with-elementtree/
 ## for an example.
 
+from __future__ import division
+import keras
+from keras.models import Sequential
+from keras.layers import Dense, Activation
+from keras.utils import to_categorical
 import os
 from collections import Counter
 try:
@@ -248,7 +253,7 @@ def main():
     outputfile = "logistic.csv"  # feel free to change this or take it as an argument
 
     # TODO put the names of the feature functions you've defined above in this list
-    ffs = [system_call_counts]
+    ffs = [system_call_counts, system_call_count_feats]
 
     # extract features
     print "extracting training features..."
@@ -258,9 +263,16 @@ def main():
 
     # TODO train here, and learn your classification parameters
     print "learning..."
-    RF = RandomForestClassifier()
-    RF.fit(X_train, t_train)
+    # RF = RandomForestClassifier()
+    # RF.fit(X_train, t_train)
     #learned_W = np.random.random((len(global_feat_dict),len(util.malware_classes)))
+    X_train = X_train.toarray()
+    y_train = to_categorical(t_train)
+    model = Sequential()
+    model.add(Dense(32,activation='relu', input_dim=X_train.shape[1]))
+    model.add(Dense(y_train.shape[1], activation='softmax'))
+    model.compile(optimizer='adam', loss='categorical_crossentropy')
+    model.fit(X_train, y_train, epochs=200, batch_size=64)
     print "done learning"
     print
 
@@ -275,8 +287,10 @@ def main():
 
     # TODO make predictions on text data and write them out
     print "making predictions..."
-    preds = RF.predict(X_test)
+    # preds = RF.predict(X_test)
     #preds = np.argmax(X_test.dot(learned_W),axis=1)
+    preds_vec = model.predict(X_test.toarray())
+    preds = np.argmax(preds_vec, axis = 1)
     print "done making predictions"
     print
 
