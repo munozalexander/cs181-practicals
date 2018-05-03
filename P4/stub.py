@@ -22,13 +22,18 @@ class Learner(object):
         self.n_bins = 4
         self.gamma = 0.5
         self.eta = .1
-        self.n_steps = 0
+        self.step = 0
+        self.epsilon_decay = 0.9
         self.Q = np.zeros((self.n_bins, self.n_bins, self.n_bins, self.n_bins, 2))
+
+    def epsilon(self):
+        return self.epsilon_decay ** self.step
 
     def reset(self):
         self.last_state  = None
         self.last_action = None
         self.last_reward = None
+        self.first_tick = True
 
     def discretize(self, val, max_val):
         bin_width = max_val / self.n_bins
@@ -61,13 +66,18 @@ class Learner(object):
         monkey_v_old = self.discretize(self.last_state['monkey']['vel'], self.max_vel)
         tree_y_old = self.discretize(self.last_state['tree']['bot'], self.screen_height)
 
-        new_action = np.argmax(self.Q[monkey_x, monkey_y, monkey_v, tree_y, :])
         prev_q = self.Q[monkey_x_old, monkey_y_old, monkey_v_old, tree_y_old, self.last_action]
         grad_q = prev_q - (self.last_reward + self.gamma * np.max(self.Q[monkey_x, monkey_y, monkey_v, tree_y, :]))
         self.Q[monkey_x_old, monkey_y_old, monkey_v_old, tree_y_old, self.last_action] -= self.eta*grad_q
 
+        if np.random.random() < self.epsilon():
+            new_action = np.random.choice(2)
+        else:
+            new_action = np.argmax(self.Q[monkey_x, monkey_y, monkey_v, tree_y, :])
+
         self.last_action = new_action
         self.last_state  = new_state
+        self.step += 1
         return self.last_action
 
     def reward_callback(self, reward):
@@ -101,15 +111,8 @@ def run_games(learner, hist, iters = 100, t_len = 100):
 
 
 if __name__ == '__main__':
-
-	# Select agent.
-	agent = Learner()
-
-	# Empty list to save history.
-	hist = []
-
-	# Run games.
-	run_games(agent, hist, 20, 10)
-
-	# Save history.
-	np.save('hist',np.array(hist))
+    agent = Learner()
+    hist = []
+    run_games(agent, hist, 100, 2)
+    print hist
+    np.save('hist',np.array(hist))
