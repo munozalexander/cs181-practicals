@@ -2,6 +2,8 @@
 import numpy as np
 import numpy.random as npr
 import pygame as pg
+import time
+import pickle
 
 from SwingyMonkey import SwingyMonkey
 
@@ -19,10 +21,10 @@ class Learner(object):
         self.screen_width = 600
         self.screen_height = 400
         self.max_vel = 60
-        self.gamma = 0.1
-        self.eta = 0.1
+        self.gamma = 0.5
+        self.eta = 0.5
         self.step = 0
-        self.epsilon_decay = 0.995
+        self.epsilon_decay = 0.999
         self.w = np.zeros(6)
 
     def Q(self, g, x, y, v, t, a):
@@ -86,6 +88,7 @@ def run_games(learner, hist, iters = 100, t_len = 100):
     '''
     Driver function to simulate learning by having the agent play a sequence of games.
     '''
+    timestamp = int(time.time())
     for ii in range(iters):
         # Make a new monkey object.
         swing = SwingyMonkey(sound=False,                  # Don't play sounds.
@@ -100,7 +103,17 @@ def run_games(learner, hist, iters = 100, t_len = 100):
 
         # Save score history.
         hist.append(swing.score)
-        print "epoch:", ii, "score:", swing.score
+        print('epoch: ' + str(ii) + ', score: ' + str(swing.score) + ', gravity: ' + str(swing.gravity) + ', running_avg: ' + str(np.average(hist[-10:])))
+
+        results = {
+            'gamma': learner.gamma,
+            'eta': learner.eta,
+            'epsilon_decay': learner.epsilon_decay,
+            'hist': hist
+        }
+
+        with open ('results/results_approx_' + str(timestamp) + '.p', 'wb') as f:
+            pickle.dump(results, f)
 
         # Reset the state of the learner.
         learner.reset()
@@ -112,5 +125,5 @@ if __name__ == '__main__':
     agent = Learner()
     hist = []
     run_games(agent, hist, 1000, 1)
-    print hist
+    print(hist)
     np.save('hist',np.array(hist))
