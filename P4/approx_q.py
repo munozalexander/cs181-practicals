@@ -19,12 +19,14 @@ class Learner(object):
         self.screen_width = 600
         self.screen_height = 400
         self.max_vel = 60
-        self.n_bins = 4
-        self.gamma = 0.5
-        self.eta = .1
+        self.gamma = 0.1
+        self.eta = 0.1
         self.step = 0
-        self.epsilon_decay = 0.9
-        self.Q = np.zeros((self.n_bins, self.n_bins, self.n_bins, self.n_bins, 2))
+        self.epsilon_decay = 0.995
+        self.w = np.zeros(6)
+
+    def Q(self, g, x, y, v, t, a):
+        return np.dot([g,x,y,v,t,a], self.w)
 
     def epsilon(self):
         return self.epsilon_decay ** self.step
@@ -35,12 +37,6 @@ class Learner(object):
         self.last_reward = None
         self.first_tick = True
 
-    def discretize(self, val, max_val):
-        bin_width = max_val / self.n_bins
-        bins = [bin_width*i for i in range(1,self.n_bins+1)]
-        loc = [val<=a for a in bins].index(True)
-        return loc
-
     def action_callback(self, state):
         '''
         Implement this function to learn things and take actions.
@@ -50,34 +46,35 @@ class Learner(object):
 
         if self.first_tick:
             if self.last_state is not None:
-                self.gravity = state['monkey']['vel'] - self.last_state['monkey']['vel']
+                self.high_grav = int(int(state['monkey']['vel'] - self.last_state['monkey']['vel']) == -4)
                 self.first_tick = False
-            self.last_state = new_state
-            self.last_action = 0
-            return self.last_action
+                self.step += 1
+            else:
+                self.last_state = new_state
+                self.last_action = 0
+                return self.last_action
 
-        monkey_x = self.discretize(new_state['tree']['dist'], self.screen_width)
-        monkey_y = self.discretize(new_state['monkey']['bot'], self.screen_height)
-        monkey_v = self.discretize(new_state['monkey']['vel'], self.max_vel)
-        tree_y = self.discretize(new_state['tree']['bot'], self.screen_height)
+        monkey_x = new_state['tree']['dist']
+        monkey_y = new_state['monkey']['bot']
+        monkey_v = new_state['monkey']['vel']
+        tree_y = new_state['tree']['bot']
 
-        monkey_x_old = self.discretize(self.last_state['tree']['dist'], self.screen_width)
-        monkey_y_old = self.discretize(self.last_state['monkey']['bot'], self.screen_height)
-        monkey_v_old = self.discretize(self.last_state['monkey']['vel'], self.max_vel)
-        tree_y_old = self.discretize(self.last_state['tree']['bot'], self.screen_height)
+        monkey_x_old = self.last_state['tree']['dist']
+        monkey_y_old = self.last_state['monkey']['bot']
+        monkey_v_old = self.last_state['monkey']['vel']
+        tree_y_old = self.last_state['tree']['bot']
 
-        prev_q = self.Q[monkey_x_old, monkey_y_old, monkey_v_old, tree_y_old, self.last_action]
-        grad_q = prev_q - (self.last_reward + self.gamma * np.max(self.Q[monkey_x, monkey_y, monkey_v, tree_y, :]))
-        self.Q[monkey_x_old, monkey_y_old, monkey_v_old, tree_y_old, self.last_action] -= self.eta*grad_q
+        prev_q = self.Q(self.high_grav, monkey_x_old, monkey_y_old, monkey_v_old, tree_y_old, self.last_action)
+        grad_q = prev_q - (self.last_reward + self.gamma * np.max([self.Q(self.high_grav, monkey_x, monkey_y, monkey_v, tree_y, 0),self.Q(self.high_grav, monkey_x, monkey_y, monkey_v, tree_y, 1)]))
+        self.w -= self.eta*grad_q*np.array([self.high_grav, monkey_x_old, monkey_y_old, monkey_v_old, tree_y_old, self.last_action])
 
         if np.random.random() < self.epsilon():
             new_action = np.random.choice(2)
         else:
-            new_action = np.argmax(self.Q[monkey_x, monkey_y, monkey_v, tree_y, :])
+            new_action = np.argmax([self.Q(self.high_grav, monkey_x, monkey_y, monkey_v, tree_y, 0),self.Q(self.high_grav, monkey_x, monkey_y, monkey_v, tree_y, 1)])
 
         self.last_action = new_action
         self.last_state  = new_state
-        self.step += 1
         return self.last_action
 
     def reward_callback(self, reward):
@@ -103,6 +100,7 @@ def run_games(learner, hist, iters = 100, t_len = 100):
 
         # Save score history.
         hist.append(swing.score)
+        print "epoch:", ii, "score:", swing.score
 
         # Reset the state of the learner.
         learner.reset()
@@ -113,6 +111,6 @@ def run_games(learner, hist, iters = 100, t_len = 100):
 if __name__ == '__main__':
     agent = Learner()
     hist = []
-    run_games(agent, hist, 100, 2)
+    run_games(agent, hist, 1000, 1)
     print hist
     np.save('hist',np.array(hist))
