@@ -19,8 +19,10 @@ class Learner(object):
         self.screen_width = 600
         self.screen_height = 400
         self.max_vel = 60
-        self.n_bins = 5
+        self.n_bins = 4
+        self.gamma = 0.5
         self.eta = .1
+        self.n_steps = 0
         self.Q = np.zeros((self.n_bins, self.n_bins, self.n_bins, self.n_bins, 2))
 
     def reset(self):
@@ -54,7 +56,16 @@ class Learner(object):
         monkey_v = self.discretize(new_state['monkey']['vel'], self.max_vel)
         tree_y = self.discretize(new_state['tree']['bot'], self.screen_height)
 
+        monkey_x_old = self.discretize(self.last_state['tree']['dist'], self.screen_width)
+        monkey_y_old = self.discretize(self.last_state['monkey']['bot'], self.screen_height)
+        monkey_v_old = self.discretize(self.last_state['monkey']['vel'], self.max_vel)
+        tree_y_old = self.discretize(self.last_state['tree']['bot'], self.screen_height)
+
         new_action = np.argmax(self.Q[monkey_x, monkey_y, monkey_v, tree_y, :])
+        prev_q = self.Q[monkey_x_old, monkey_y_old, monkey_v_old, tree_y_old, self.last_action]
+        grad_q = prev_q - (self.last_reward + self.gamma * np.max(self.Q[monkey_x, monkey_y, monkey_v, tree_y, :]))
+        self.Q[monkey_x_old, monkey_y_old, monkey_v_old, tree_y_old, self.last_action] -= self.eta*grad_q
+
         self.last_action = new_action
         self.last_state  = new_state
         return self.last_action
@@ -62,12 +73,6 @@ class Learner(object):
     def reward_callback(self, reward):
         '''This gets called so you can see what reward you get.'''
         self.last_reward = reward
-        monkey_x = self.discretize(self.last_state['tree']['dist'], self.screen_width)
-        monkey_y = self.discretize(self.last_state['monkey']['bot'], self.screen_height)
-        monkey_v = self.discretize(self.last_state['monkey']['vel'], self.max_vel)
-        tree_y = self.discretize(self.last_state['tree']['bot'], self.screen_height)
-        q_curr = self.Q[monkey_x, monkey_y, monkey_v, tree_y, self.last_action]
-        q_fut = self.Q[monkey_x, monkey_y, monkey_v, tree_y]
 
 
 def run_games(learner, hist, iters = 100, t_len = 100):
